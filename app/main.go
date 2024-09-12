@@ -20,42 +20,46 @@ func main() {
 		fmt.Println("Failed to bind to port 4221")
 		os.Exit(1)
 	}
+	defer l.Close()
 
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			continue
+		}
+
+		req, err := request.BuildRequest(conn)
+		var resp *response.Response
+
+		if err != nil {
+			handleConnection(conn, response.New(400, err.Error()))
+			continue
+		}
+
+		resp = indexRoute(req)
+		if resp != nil {
+			handleConnection(conn, resp)
+			continue
+		}
+
+		resp = echoRoute(req)
+		if resp != nil {
+			handleConnection(conn, resp)
+			continue
+		}
+
+		if resp = userAgentRoute(req); resp != nil {
+			handleConnection(conn, resp)
+			continue
+		}
+
+		handleConnection(conn, response.New(404, ""))
 	}
 
-	req, err := request.BuildRequest(conn)
-	var resp *response.Response
-
-	if err != nil {
-		finish(conn, response.New(400, err.Error()))
-		return
-	}
-
-	resp = indexRoute(req)
-	if resp != nil {
-		finish(conn, resp)
-		return
-	}
-
-	resp = echoRoute(req)
-	if resp != nil {
-		finish(conn, resp)
-		return
-	}
-
-	if resp = userAgentRoute(req); resp != nil {
-		finish(conn, resp)
-		return
-	}
-
-	finish(conn, response.New(404, ""))
 }
 
-func finish(conn net.Conn, resp *response.Response) {
+func handleConnection(conn net.Conn, resp *response.Response) {
 	conn.Write([]byte(resp.String()))
 	conn.Close()
 }
