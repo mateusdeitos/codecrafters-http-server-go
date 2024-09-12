@@ -47,6 +47,11 @@ func main() {
 		return
 	}
 
+	if resp = userAgentRoute(req); resp != nil {
+		finish(conn, resp)
+		return
+	}
+
 	finish(conn, response.New(404, ""))
 }
 
@@ -80,4 +85,16 @@ func echoRoute(req *request.Request) *response.Response {
 	}
 
 	return response.New(200, string(param))
+}
+
+func userAgentRoute(req *request.Request) *response.Response {
+	if req.Method != "GET" {
+		return nil
+	}
+
+	if req.Path != "/user-agent" {
+		return nil
+	}
+
+	return response.New(200, req.Headers["User-Agent"])
 }
