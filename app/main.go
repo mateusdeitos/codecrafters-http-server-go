@@ -23,40 +23,43 @@ func main() {
 	defer l.Close()
 
 	for {
-		conn, err := l.Accept()
-		if err != nil {
-			fmt.Println("Error accepting connection: ", err.Error())
-			continue
-		}
-
-		req, err := request.BuildRequest(conn)
-		var resp *response.Response
-
-		if err != nil {
-			handleConnection(conn, response.New(400, err.Error()))
-			continue
-		}
-
-		resp = indexRoute(req)
-		if resp != nil {
-			handleConnection(conn, resp)
-			continue
-		}
-
-		resp = echoRoute(req)
-		if resp != nil {
-			handleConnection(conn, resp)
-			continue
-		}
-
-		if resp = userAgentRoute(req); resp != nil {
-			handleConnection(conn, resp)
-			continue
-		}
-
-		handleConnection(conn, response.New(404, ""))
+		go runListener(l)
 	}
 
+}
+
+func runListener(l net.Listener) {
+
+	conn, err := l.Accept()
+	if err != nil {
+		fmt.Println("Error accepting connection: ", err.Error())
+		return
+	}
+
+	req, err := request.BuildRequest(conn)
+	var resp *response.Response
+
+	if err != nil {
+		handleConnection(conn, response.New(400, err.Error()))
+		return
+	}
+
+	if resp = indexRoute(req); resp != nil {
+		handleConnection(conn, resp)
+		return
+	}
+
+	if resp = echoRoute(req); resp != nil {
+		handleConnection(conn, resp)
+		return
+	}
+
+	if resp = userAgentRoute(req); resp != nil {
+		handleConnection(conn, resp)
+		return
+	}
+
+	handleConnection(conn, response.New(404, ""))
 }
 
 func handleConnection(conn net.Conn, resp *response.Response) {
