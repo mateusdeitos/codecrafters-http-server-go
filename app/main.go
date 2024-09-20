@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	"github.com/codecrafters-io/http-server-starter-go/app/request"
@@ -22,14 +23,18 @@ func main() {
 	}
 	defer l.Close()
 
+	rootDir := "tmp"
+	if len(os.Args) > 2 {
+		rootDir = os.Args[2]
+	}
+
 	for {
-		go runListener(l)
+		go runListener(l, rootDir)
 	}
 
 }
 
-func runListener(l net.Listener) {
-
+func runListener(l net.Listener, rootDir string) {
 	conn, err := l.Accept()
 	if err != nil {
 		fmt.Println("Error accepting connection: ", err.Error())
@@ -55,6 +60,11 @@ func runListener(l net.Listener) {
 	}
 
 	if resp = userAgentRoute(req); resp != nil {
+		handleConnection(conn, resp)
+		return
+	}
+
+	if resp = fileRoute(rootDir, req); resp != nil {
 		handleConnection(conn, resp)
 		return
 	}
@@ -104,4 +114,41 @@ func userAgentRoute(req *request.Request) *response.Response {
 	}
 
 	return response.New(200, req.Headers["User-Agent"])
+}
+
+func fileRoute(rootDir string, req *request.Request) *response.Response {
+	if req.Method != "GET" {
+		return nil
+	}
+
+	fmt.Println("rootDir", rootDir)
+
+	rx := regexp.MustCompile("^/files/([^/]+)$")
+	matches := rx.FindStringSubmatch(req.Path)
+	if matches == nil {
+		return nil
+	}
+
+	filename := matches[1]
+	if filename == "" {
+		return nil
+	}
+
+	filename = filepath.Join(rootDir, filename)
+
+	s, err := os.Stat(filename)
+	if err != nil && os.IsNotExist(err) {
+		return response.New(404, "")
+	}
+
+	if s.IsDir() {
+		return response.New(404, "")
+	}
+
+	contents, _ := os.ReadFile(filename)
+
+	r := response.New(200, string(contents))
+	r.AddHeader("Content-Type", "application/octet-stream")
+	r.AddHeader("Content-Length", fmt.Sprintf("%d", len(contents)))
+	return r
 }
