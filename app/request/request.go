@@ -35,6 +35,10 @@ func BuildRequest(c reader) (*Request, error) {
 		return nil, err
 	}
 
+	if err := req.parseBody(s); err != nil {
+		return nil, err
+	}
+
 	return req, nil
 }
 
@@ -108,6 +112,18 @@ func (r *Request) parseHeaders(rs string) error {
 		default:
 			r.Headers[k] = v
 		}
+	}
+
+	return nil
+}
+
+func (r *Request) parseBody(rs string) error {
+	a := strings.Split(rs, "\r\n\r\n")
+
+	if len(a) > 1 {
+		r.Body = a[1]
+	} else {
+		r.Body = ""
 	}
 
 	return nil

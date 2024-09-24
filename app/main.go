@@ -29,18 +29,18 @@ func main() {
 	}
 
 	for {
-		go runListener(l, rootDir)
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			return
+		}
+
+		go runListener(conn, rootDir)
 	}
 
 }
 
-func runListener(l net.Listener, rootDir string) {
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		return
-	}
-
+func runListener(conn net.Conn, rootDir string) {
 	req, err := request.BuildRequest(conn)
 	var resp *response.Response
 
@@ -65,6 +65,11 @@ func runListener(l net.Listener, rootDir string) {
 	}
 
 	if resp = fileRoute(rootDir, req); resp != nil {
+		handleConnection(conn, resp)
+		return
+	}
+
+	if resp = createFileRoute(rootDir, req); resp != nil {
 		handleConnection(conn, resp)
 		return
 	}
@@ -121,8 +126,6 @@ func fileRoute(rootDir string, req *request.Request) *response.Response {
 		return nil
 	}
 
-	fmt.Println("rootDir", rootDir)
-
 	rx := regexp.MustCompile("^/files/([^/]+)$")
 	matches := rx.FindStringSubmatch(req.Path)
 	if matches == nil {
@@ -150,5 +153,49 @@ func fileRoute(rootDir string, req *request.Request) *response.Response {
 	r := response.New(200, string(contents))
 	r.AddHeader("Content-Type", "application/octet-stream")
 	r.AddHeader("Content-Length", fmt.Sprintf("%d", len(contents)))
+	return r
+}
+
+func createFileRoute(rootDir string, req *request.Request) *response.Response {
+	if req.Method != "POST" {
+		return nil
+	}
+
+	rx := regexp.MustCompile("^/files/([^/]+)$")
+	matches := rx.FindStringSubmatch(req.Path)
+	if matches == nil {
+		return nil
+	}
+
+	filename := matches[1]
+	if filename == "" {
+		return nil
+	}
+
+	_, err := os.Stat(rootDir)
+	if err != nil && os.IsNotExist(err) {
+		err = os.Mkdir(rootDir, 0644)
+		if err != nil {
+			return response.New(400, err.Error())
+		}
+	}
+
+	filename = filepath.Join(rootDir, filename)
+
+	s, err := os.Stat(filename)
+	if err != nil && os.IsExist(err) {
+		return response.New(400, "")
+	}
+
+	if s != nil && s.IsDir() {
+		return response.New(400, "")
+	}
+
+	err = os.WriteFile(filename, []byte(req.Body), 0644)
+	if err != nil {
+		return response.New(400, err.Error())
+	}
+
+	r := response.New(201, "")
 	return r
 }

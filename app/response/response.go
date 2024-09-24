@@ -10,12 +10,16 @@ func (s status) String() string {
 	switch s {
 	case 200:
 		return "200 OK"
+	case 201:
+		return "201 Created"
+	case 204:
+		return "204 No Content"
 	case 400:
 		return "400 Bad Request"
 	case 404:
 		return "404 Not Found"
 	default:
-		return "500 Internal Server Error"
+		panic("invalid status code")
 	}
 }
 
@@ -32,8 +36,11 @@ func New(s int, body string) *Response {
 		Body:    body,
 	}
 
-	r.AddHeader("Content-Length", fmt.Sprintf("%d", len(r.Body)))
-	r.AddHeader("Content-Type", "text/plain")
+	bl := len(r.Body)
+	r.AddHeader("Content-Length", fmt.Sprintf("%d", bl))
+	if bl > 0 {
+		r.AddHeader("Content-Type", "text/plain")
+	}
 
 	return r
 }
