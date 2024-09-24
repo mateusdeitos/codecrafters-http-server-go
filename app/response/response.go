@@ -49,6 +49,12 @@ func (s *Response) AddHeader(key, value string) {
 	s.Headers[key] = value
 }
 
+func (r *Response) Compress(acceptEncoding string) {
+	if acceptEncoding == "gzip" {
+		r.Headers["Content-Encoding"] = "gzip"
+	}
+}
+
 func (r *Response) String() string {
 	resp := fmt.Sprintf("HTTP/1.1 %s\r\n", r.Status.String())
 	for k, v := range r.Headers {

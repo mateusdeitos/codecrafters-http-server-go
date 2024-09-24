@@ -45,39 +45,40 @@ func runListener(conn net.Conn, rootDir string) {
 	var resp *response.Response
 
 	if err != nil {
-		handleConnection(conn, response.New(400, err.Error()))
+		handleConnection(conn, req, response.New(400, err.Error()))
 		return
 	}
 
 	if resp = indexRoute(req); resp != nil {
-		handleConnection(conn, resp)
+		handleConnection(conn, req, resp)
 		return
 	}
 
 	if resp = echoRoute(req); resp != nil {
-		handleConnection(conn, resp)
+		handleConnection(conn, req, resp)
 		return
 	}
 
 	if resp = userAgentRoute(req); resp != nil {
-		handleConnection(conn, resp)
+		handleConnection(conn, req, resp)
 		return
 	}
 
 	if resp = fileRoute(rootDir, req); resp != nil {
-		handleConnection(conn, resp)
+		handleConnection(conn, req, resp)
 		return
 	}
 
 	if resp = createFileRoute(rootDir, req); resp != nil {
-		handleConnection(conn, resp)
+		handleConnection(conn, req, resp)
 		return
 	}
 
-	handleConnection(conn, response.New(404, ""))
+	handleConnection(conn, req, response.New(404, ""))
 }
 
-func handleConnection(conn net.Conn, resp *response.Response) {
+func handleConnection(conn net.Conn, req *request.Request, resp *response.Response) {
+	resp.Compress(req.Headers["Accept-Encoding"])
 	conn.Write([]byte(resp.String()))
 	conn.Close()
 }
