@@ -2,6 +2,7 @@ package response
 
 import (
 	"fmt"
+	"strings"
 )
 
 type status int
@@ -50,9 +51,20 @@ func (s *Response) AddHeader(key, value string) {
 }
 
 func (r *Response) Compress(acceptEncoding string) {
-	if acceptEncoding == "gzip" {
-		r.Headers["Content-Encoding"] = "gzip"
+	supportedEncodings := map[string]bool{"gzip": true}
+
+	for _, v := range strings.Split(acceptEncoding, ",") {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+
+		if supportedEncodings[v] {
+			r.Headers["Content-Encoding"] = v
+			return
+		}
 	}
+
 }
 
 func (r *Response) String() string {
