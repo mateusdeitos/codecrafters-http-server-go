@@ -79,7 +79,7 @@ func runListener(conn net.Conn, rootDir string) {
 
 func handleConnection(conn net.Conn, req *request.Request, resp *response.Response) {
 	resp.Compress(req.Headers["Accept-Encoding"])
-	conn.Write([]byte(resp.String()))
+	resp.Write(conn)
 	conn.Close()
 }
 
