@@ -170,7 +170,10 @@ func fileRoute(rootDir string, req *request.Request) *response.Response {
 		return response.New(http.StatusNotFound, nil)
 	}
 
-	contents, _ := os.ReadFile(filename)
+	contents, err := os.ReadFile(filename)
+	if err != nil {
+		return response.New(http.StatusInternalServerError, []byte("Error reading file"))
+	}
 
 	r := response.New(http.StatusOK, contents)
 	r.AddHeader("Content-Type", "application/octet-stream")
