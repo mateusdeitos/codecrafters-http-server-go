@@ -32,13 +32,12 @@ func (s status) String() string {
 }
 
 type Response struct {
-	Headers        map[string]string
-	Status         status
-	Body           string
-	CompressedBody []byte
+	Headers map[string]string
+	Status  status
+	Body    []byte
 }
 
-func New(s int, body string) *Response {
+func New(s int, body []byte) *Response {
 	r := &Response{
 		Headers: make(map[string]string),
 		Status:  status(s),
@@ -80,24 +79,12 @@ func (r *Response) Compress(acceptEncoding string) {
 				continue
 			}
 
-			r.CompressedBody = b
+			r.Body = b
 			r.Headers["Content-Encoding"] = v
-			r.Headers["Content-Length"] = fmt.Sprintf("%d", len(r.CompressedBody))
+			r.Headers["Content-Length"] = fmt.Sprintf("%d", len(r.Body))
 			break
 		}
 	}
-}
-
-func (r *Response) String() string {
-	resp := fmt.Sprintf("HTTP/1.1 %s\r\n", r.Status.String())
-	for k, v := range r.Headers {
-		resp += fmt.Sprintf("%s: %s\r\n", k, v)
-	}
-
-	resp += "\r\n"
-	resp += r.Body
-
-	return resp
 }
 
 func (r *Response) Write(w io.Writer) error {
@@ -113,23 +100,18 @@ func (r *Response) Write(w io.Writer) error {
 		return err
 	}
 
-	if r.CompressedBody != nil {
-		_, err := w.Write(r.CompressedBody)
-		return err
-	}
-
-	if r.Body != "" {
-		_, err := w.Write([]byte(r.Body))
+	if r.Body != nil {
+		_, err := w.Write(r.Body)
 		return err
 	}
 
 	return nil
 }
 
-func gzipCompress(body string) ([]byte, error) {
+func gzipCompress(body []byte) ([]byte, error) {
 	var b bytes.Buffer
 	w := gzip.NewWriter(&b)
-	if _, err := w.Write([]byte(body)); err != nil {
+	if _, err := w.Write(body); err != nil {
 		return nil, err
 	}
 

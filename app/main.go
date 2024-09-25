@@ -45,7 +45,7 @@ func runListener(conn net.Conn, rootDir string) {
 	var resp *response.Response
 
 	if err != nil {
-		handleConnection(conn, req, response.New(400, err.Error()))
+		handleConnection(conn, req, response.New(400, []byte(err.Error())))
 		return
 	}
 
@@ -74,7 +74,7 @@ func runListener(conn net.Conn, rootDir string) {
 		return
 	}
 
-	handleConnection(conn, req, response.New(404, ""))
+	handleConnection(conn, req, response.New(404, nil))
 }
 
 func handleConnection(conn net.Conn, req *request.Request, resp *response.Response) {
@@ -92,7 +92,7 @@ func indexRoute(req *request.Request) *response.Response {
 		return nil
 	}
 
-	return response.New(200, "")
+	return response.New(200, nil)
 }
 
 func echoRoute(req *request.Request) *response.Response {
@@ -107,7 +107,7 @@ func echoRoute(req *request.Request) *response.Response {
 		return nil
 	}
 
-	return response.New(200, string(param))
+	return response.New(200, []byte(param))
 }
 
 func userAgentRoute(req *request.Request) *response.Response {
@@ -119,7 +119,7 @@ func userAgentRoute(req *request.Request) *response.Response {
 		return nil
 	}
 
-	return response.New(200, req.Headers["User-Agent"])
+	return response.New(200, []byte(req.Headers["User-Agent"]))
 }
 
 func fileRoute(rootDir string, req *request.Request) *response.Response {
@@ -142,16 +142,16 @@ func fileRoute(rootDir string, req *request.Request) *response.Response {
 
 	s, err := os.Stat(filename)
 	if err != nil && os.IsNotExist(err) {
-		return response.New(404, "")
+		return response.New(404, nil)
 	}
 
 	if s.IsDir() {
-		return response.New(404, "")
+		return response.New(404, nil)
 	}
 
 	contents, _ := os.ReadFile(filename)
 
-	r := response.New(200, string(contents))
+	r := response.New(200, contents)
 	r.AddHeader("Content-Type", "application/octet-stream")
 	r.AddHeader("Content-Length", fmt.Sprintf("%d", len(contents)))
 	return r
@@ -177,7 +177,7 @@ func createFileRoute(rootDir string, req *request.Request) *response.Response {
 	if err != nil && os.IsNotExist(err) {
 		err = os.Mkdir(rootDir, 0644)
 		if err != nil {
-			return response.New(400, err.Error())
+			return response.New(400, []byte(err.Error()))
 		}
 	}
 
@@ -185,18 +185,18 @@ func createFileRoute(rootDir string, req *request.Request) *response.Response {
 
 	s, err := os.Stat(filename)
 	if err != nil && os.IsExist(err) {
-		return response.New(400, "")
+		return response.New(400, nil)
 	}
 
 	if s != nil && s.IsDir() {
-		return response.New(400, "")
+		return response.New(400, nil)
 	}
 
 	err = os.WriteFile(filename, []byte(req.Body), 0644)
 	if err != nil {
-		return response.New(400, err.Error())
+		return response.New(400, []byte(err.Error()))
 	}
 
-	r := response.New(201, "")
+	r := response.New(201, nil)
 	return r
 }
