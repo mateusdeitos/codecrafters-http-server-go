@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -35,6 +38,10 @@ func main() {
 	if len(os.Args) > 2 {
 		rootDir = os.Args[2]
 	}
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	fmt.Println("Listening on port 4221...")
 
 	go func() {
 		for {
@@ -49,7 +56,7 @@ func main() {
 				}
 			}
 
-			go runListener(conn, rootDir)
+			go runListener(ctx, conn, rootDir)
 		}
 
 	}()
@@ -59,47 +66,60 @@ func main() {
 
 }
 
-func runListener(conn net.Conn, rootDir string) {
-	req, err := request.BuildRequest(conn)
-	var resp *response.Response
+func runListener(ctx context.Context, conn net.Conn, rootDir string) {
+	defer conn.Close()
 
-	if err != nil {
-		processRequest(conn, req, response.New(http.StatusBadRequest, []byte(err.Error())))
-		return
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			req, err := request.BuildRequest(conn)
+			var resp *response.Response
+
+			if err != nil && errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				fmt.Println("Client disconnected")
+				return
+			}
+
+			if err != nil {
+				processRequest(conn, req, response.New(http.StatusBadRequest, []byte(err.Error())))
+				continue
+			}
+
+			if resp = indexRoute(req); resp != nil {
+				processRequest(conn, req, resp)
+				continue
+			}
+
+			if resp = echoRoute(req); resp != nil {
+				processRequest(conn, req, resp)
+				continue
+			}
+
+			if resp = userAgentRoute(req); resp != nil {
+				processRequest(conn, req, resp)
+				continue
+			}
+
+			if resp = fileRoute(rootDir, req); resp != nil {
+				processRequest(conn, req, resp)
+				continue
+			}
+
+			if resp = createFileRoute(rootDir, req); resp != nil {
+				processRequest(conn, req, resp)
+				continue
+			}
+
+			processRequest(conn, req, response.New(http.StatusNotFound, nil))
+		}
 	}
-
-	if resp = indexRoute(req); resp != nil {
-		processRequest(conn, req, resp)
-		return
-	}
-
-	if resp = echoRoute(req); resp != nil {
-		processRequest(conn, req, resp)
-		return
-	}
-
-	if resp = userAgentRoute(req); resp != nil {
-		processRequest(conn, req, resp)
-		return
-	}
-
-	if resp = fileRoute(rootDir, req); resp != nil {
-		processRequest(conn, req, resp)
-		return
-	}
-
-	if resp = createFileRoute(rootDir, req); resp != nil {
-		processRequest(conn, req, resp)
-		return
-	}
-
-	processRequest(conn, req, response.New(http.StatusNotFound, nil))
 }
 
 func processRequest(conn net.Conn, req *request.Request, resp *response.Response) {
 	resp.Compress(req.Headers["Accept-Encoding"])
 	resp.Write(conn)
-	conn.Close()
 }
 
 func indexRoute(req *request.Request) *response.Response {
