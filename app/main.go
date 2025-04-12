@@ -119,6 +119,12 @@ func runListener(ctx context.Context, conn net.Conn, rootDir string) {
 
 func processRequest(conn net.Conn, req *request.Request, resp *response.Response) {
 	resp.Compress(req.Headers["Accept-Encoding"])
+
+	if req.Headers["Connection"] == "close" {
+		resp.AddHeader("Connection", "close")
+		defer conn.Close()
+	}
+
 	resp.Write(conn)
 }
 
